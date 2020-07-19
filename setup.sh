@@ -3,8 +3,6 @@
 ## Set node name
 hostnamectl set-hostname node-1
 
-sudo yum install unzip
-
 ## Firewall
 sed -i --follow-symlinks 's/SELINUX=enforcing/SELINUX=disabled/g' /etc/sysconfig/selinux
 firewall-cmd --permanent --add-port=6443/tcp
@@ -28,7 +26,7 @@ repo_gpgcheck=1
 gpgkey=https://mirrors.aliyun.com/kubernetes/yum/doc/yum-key.gpg https://mirrors.aliyun.com/kubernetes/yum/doc/rpm-package-key.gpg
 EOF
 setenforce 0
-yum install -y kubelet kubeadm kubectl
+yum install -y unzip kubelet kubeadm kubectl
 systemctl enable kubelet && systemctl start kubelet
 swapoff -a && sed -i '/swap/d' /etc/fstab
 
