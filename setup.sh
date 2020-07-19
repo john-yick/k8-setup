@@ -3,6 +3,8 @@
 ## Set node name
 hostnamectl set-hostname node-1
 
+sudo yum install unzip
+
 ## Firewall
 sed -i --follow-symlinks 's/SELINUX=enforcing/SELINUX=disabled/g' /etc/sysconfig/selinux
 firewall-cmd --permanent --add-port=6443/tcp
@@ -11,7 +13,7 @@ firewall-cmd --permanent --add-port=10250/tcp
 firewall-cmd --permanent --add-port=10251/tcp
 firewall-cmd --permanent --add-port=10252/tcp
 firewall-cmd --permanent --add-port=10255/tcp
-firewall-cmd –reload
+firewall-cmd --reload
 modprobe br_netfilter
 echo '1' > /proc/sys/net/bridge/bridge-nf-call-iptables
 
@@ -29,9 +31,6 @@ setenforce 0
 yum install -y kubelet kubeadm kubectl
 systemctl enable kubelet && systemctl start kubelet
 swapoff -a && sed -i '/swap/d' /etc/fstab
-
-## Pull images from Aliyuncs
-kubeadm config images pull --image-repository registry.aliyuncs.com/google_containers
 
 ## Update Cgroup drivers
 yum install -y yum-utils device-mapper-persistent-data lvm2
@@ -53,25 +52,38 @@ EOF
 systemctl daemon-reload
 systemctl restart docker
 
-# Master Node
-sudo kubeadm init --image-repository registry.aliyuncs.com/google_containers
 
+## Install K8
+curl -LO https://github.com/gotok8s/gotok8s/archive/master.zip
+unzip master.zip
+cd gotok8s-master
+kubeadm config images pull --config init.yml
+
+
+
+
+# Master node
+sudo kubeadm init --config init.yml
 mkdir -p $HOME/.kube
 cp -i /etc/kubernetes/admin.conf $HOME/.kube/config
 chown $(id -u):$(id -g) $HOME/.kube/config
 
+
 ## Create network
+kubectl apply -f https://docs.projectcalico.org/manifests/calico.yaml 
+
 export kubever=$(kubectl version | base64 | tr -d '\n')
 kubectl apply -f "https://cloud.weave.works/k8s/net?k8s-version=$kubever"
-kubectl get nodes
-
-## Install Helm
-sudo yum install snapd epel-release -y
-sudo systemctl enable --now snapd.socket
-sudo ln -s /var/lib/snapd/snap /snap
-sleep 10s # need to let snap initiate
-sudo snap install helm --classic
 
 
-## Trigger reboot 
-reboot
+# Dashboard
+kubectl apply -f http://yicksolutions.ddns.net:81/endpoints/lib/content/reccommended.yaml
+kubectl proxy
+
+ssh -L 8001:127.0.0.1:8001 root@192.168.1.87
+http://localhost:8001/api/v1/namespaces/kubernetes-dashboard/services/https:kubernetes-dashboard:/proxy/
+
+
+# Dashboard admin user
+kubectl apply -f http://yicksolutions.ddns.net:81/endpoints/lib/content/dashboard-admin.yaml
+kubectl -n kubernetes-dashboard describe secret $(kubectl -n kubernetes-dashboard get secret | grep kubernetes-dashboard-admin | awk '{print $1}')
